@@ -11,7 +11,7 @@ export default function LoginForm() {
   const { register, handleSubmit } = useForm<FormData>();
 
   const onSubmit = async (data: FormData) => {
-    // Send typed creds to your API route
+    // Send creds to API route
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
