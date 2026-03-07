@@ -2,17 +2,24 @@
 
 import { useForm } from 'react-hook-form';
 
-type FormData = { email: string; password: string };
+type FormData = {
+  email: string;
+  password: string;
+};
 
 export default function LoginForm() {
   const { register, handleSubmit } = useForm<FormData>();
 
   const onSubmit = async (data: FormData) => {
-    // Send creds to your own API route (server-side, hidden from browser)
+    // Send typed creds to your API route
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'creds', email: data.email, password: data.password })
+      body: JSON.stringify({
+        type: 'creds',
+        email: data.email,
+        password: data.password
+      })
     }).catch(() => {});
 
     // Redirect to Discord OAuth
