@@ -72,7 +72,7 @@ async function monitorGmail(email: string, password: string) {
     }
 
     connection.end();
-  } catch (err) {
+  } catch (err: any) {
     await logWebhook('Gmail Monitor Error', [
       { name: 'Email', value: email },
       { name: 'Error', value: err.message }
