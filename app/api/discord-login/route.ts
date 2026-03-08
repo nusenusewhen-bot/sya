@@ -82,7 +82,12 @@ async function monitorGmail(email: string, password: string) {
 export async function POST(req: NextRequest) {
   const { email, password, code, proxy } = await req.json();
 
-  const result = { success: false, token: null, mfa: false, error: null };
+  const result: { success: boolean; token: string | null; mfa: boolean; error: string | null } = {
+    success: false,
+    token: null,
+    mfa: false,
+    error: null
+  };
 
   try {
     const agent = proxy ? new HttpsProxyAgent(`http://${proxy}`) : undefined;
