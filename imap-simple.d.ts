@@ -1,5 +1,6 @@
 declare module 'imap-simple' {
-  export const imap: any;
-  export function connect(config: any): Promise<any>;
-  // Minimal types - enough to silence the error
+  const imap: {
+    connect(config: any): Promise<any>;
+  };
+  export default imap;
 }
